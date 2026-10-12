@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-heading-en: 'Playfair Display', Georgia, serif;
+    --font-body-en: 'Plus Jakarta Sans', system-ui, sans-serif;
+    --font-heading-ar: 'Amiri', 'Traditional Arabic', serif;
+    --font-body-ar: 'Cairo', system-ui, sans-serif;
+  }
+
+  [dir="rtl"] {
+    font-family: var(--font-body-ar);
+  }
+
+  [dir="ltr"] {
+    font-family: var(--font-body-en);
+  }
+}
+
+.font-heading {
+  font-family: var(--font-heading-en);
+}
+
+[dir="rtl"] .font-heading {
+  font-family: var(--font-heading-ar);
+}
+
+.font-body {
+  font-family: var(--font-body-en);
+}
+
+[dir="rtl"] .font-body {
+  font-family: var(--font-body-ar);
+}
+
+/* Subtle Omani geometric mashrabiya pattern overlay */
+.bg-omani-pattern {
+  background-image: radial-gradient(circle at 1px 1px, rgba(197, 160, 89, 0.08) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.bg-omani-ornament {
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30L30 0zm0 10L10 30L30 50L50 30L30 10z' fill='%23c5a059' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #111113;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2a30;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #c5a059;
+}

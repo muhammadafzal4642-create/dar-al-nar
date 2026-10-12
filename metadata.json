@@ -1,0 +1,6 @@
+{
+  "name": "DAR AL NAR | دار النار — Luxury Omani Restaurant & Management Dashboard",
+  "description": "Premium modern Omani dining experience and restaurant management platform in Muscat, Sultanate of Oman.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
