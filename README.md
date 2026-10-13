@@ -1,33 +1,43 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# DAR AL NAR | دار النار — Luxury Omani Restaurant & Management Dashboard
 
-# Run and deploy your AI Studio app
+A luxury Omani restaurant platform featuring modern culinary showcases, table reservations, private event inquiries, and an administrative management dashboard.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/be9fc2f2-d8b9-47ea-95b2-c73f3c31afe5
+- **Luxury Guest Experience**: Bilingual (Arabic & English) presentation with smooth animations.
+- **Reservation System**: Real-time table booking with authentic Omani reference numbering (`DAN-2026-XXXX`).
+- **Private Dining & Event Inquiries**: Lead collection and event booking system.
+- **Admin Management Dashboard**:
+  - Live Overview & KPIs
+  - Table Reservations Management
+  - Culinary Menu Management
+  - Private Event Inquiries
+  - Restaurant Settings & Localization
+- **Browser-Persisted Storage**: Standalone, persistent storage using `localStorage` — runs out of the box with zero database configuration required.
 
 ## Run Locally
 
-**Prerequisites:** Node.js
+**Prerequisites:** Node.js (v18+)
 
-1. Install dependencies with `npm install`.
-2. Copy `.env.example` to `.env.local`.
-3. Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` in `.env.local` to your own login credentials. Keep these variables server-only; do not add the `VITE_` prefix. Leave the `VITE_SUPABASE_*` values blank for local login.
-4. Start the app with `npm run dev` and open `http://localhost:3000`.
-5. Choose **Admin Dashboard** and sign in with the credentials from `.env.local`. Use the sign-out icon in the dashboard header to log out.
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Start the local development server:
+   ```bash
+   npm run dev
+   ```
+3. Open `http://localhost:3000` in your browser.
 
-Local admin sessions are validated by the Vite development server and expire after eight hours. Restaurant data is stored in this browser's local storage when Supabase is not configured.
+## Administrator Access
 
-## Supabase Deployment
+- Click **Admin** in the navigation bar.
+- **Default Username:** `admin`
+- **Default Password:** `admin123456`
 
-For a shared, persistent database, add the Supabase URL and publishable key to `.env.local`, then run [supabase/schema.sql](supabase/schema.sql) in the Supabase SQL Editor. Enable email/password authentication, create an administrator user, and assign its server-managed role with:
+## Deploy to Vercel
 
-```sql
-update auth.users
-set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role":"admin"}'::jsonb
-where email = 'admin@example.com';
-```
-
-The first authorized admin sign-in seeds the initial menu and restaurant settings. Public visitors can submit reservations and inquiries, but only users with the server-managed `admin` role can read private records or change/delete database records. Never place a Supabase service-role key in this frontend.
+1. Push your repository to GitHub.
+2. In Vercel, import your repository.
+3. The framework will automatically be detected as **Vite**.
+4. Click **Deploy**.

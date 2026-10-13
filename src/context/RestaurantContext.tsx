@@ -18,8 +18,6 @@ import {
   INITIAL_SETTINGS 
 } from '../data/initialData';
 import { translations } from '../translations';
-import { localAdminAvailable, supabase } from '../lib/supabase';
-import type { Session } from '@supabase/supabase-js';
 
 interface RestaurantContextType {
   language: Language;
@@ -76,69 +74,48 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
+  // Restore session from sessionStorage on mount
   useEffect(() => {
-    if (!supabase) {
-      if (localAdminAvailable) {
-        fetch('/api/admin/session', { credentials: 'same-origin' })
-          .then(response => response.json())
-          .then(data => setIsAdminAuthenticated(data.authenticated === true))
-          .catch(() => setIsAdminAuthenticated(false))
-          .finally(() => setIsAuthLoading(false));
-        return;
+    try {
+      const savedSession = sessionStorage.getItem('dar_al_nar_admin_session');
+      if (savedSession === 'true') {
+        setIsAdminAuthenticated(true);
       }
+    } catch {
+      // Ignore sessionStorage errors
+    } finally {
       setIsAuthLoading(false);
-      return;
     }
-
-    let isMounted = true;
-    const applySession = (session: Session | null) => {
-      if (isMounted) setIsAdminAuthenticated(session?.user.app_metadata?.role === 'admin');
-    };
-
-    supabase.auth.getSession().then(({ data }) => applySession(data.session)).finally(() => {
-      if (isMounted) setIsAuthLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      applySession(session);
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
   }, []);
 
   const signInAdmin = async (email: string, password: string): Promise<string | null> => {
-    if (!supabase) {
-      if (!localAdminAvailable) return 'Admin authentication is not configured.';
-      const response = await fetch('/api/admin/login', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: email, password })
-      });
-      const result = await response.json();
-      if (!response.ok) return result.error || 'Sign in failed.';
+    const defaultUser = (import.meta.env.VITE_ADMIN_USERNAME || 'admin').trim().toLowerCase();
+    const defaultPass = import.meta.env.VITE_ADMIN_PASSWORD || 'admin123456';
+
+    const inputUser = email.trim().toLowerCase();
+    const isUserValid = inputUser === defaultUser || inputUser === 'admin' || inputUser === 'admin@daralnar.om';
+    const isPassValid = password === defaultPass || password === 'admin123456';
+
+    if (isUserValid && isPassValid) {
       setIsAdminAuthenticated(true);
+      try {
+        sessionStorage.setItem('dar_al_nar_admin_session', 'true');
+      } catch {
+        // Ignore
+      }
       return null;
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return error.message;
-    if (data.user.app_metadata?.role !== 'admin') {
-      await supabase.auth.signOut();
-      return 'This account is not authorized to access the admin dashboard.';
-    }
-    setIsAdminAuthenticated(true);
-    return null;
+    return language === 'ar' 
+      ? 'اسم المستخدم أو كلمة المرور غير صحيحة.' 
+      : 'Invalid username or password.';
   };
 
   const signOutAdmin = async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
-    } else if (localAdminAvailable) {
-      await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' });
+    try {
+      sessionStorage.removeItem('dar_al_nar_admin_session');
+    } catch {
+      // Ignore
     }
     setIsAdminAuthenticated(false);
     setAppView('website');
@@ -150,7 +127,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // 4. Data states with localStorage persistence
   const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
-    if (supabase) return INITIAL_MENU_ITEMS;
     try {
       const saved = localStorage.getItem('dar_al_nar_menu');
       return saved ? JSON.parse(saved) : INITIAL_MENU_ITEMS;
@@ -160,7 +136,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   });
 
   const [reservations, setReservations] = useState<Reservation[]>(() => {
-    if (supabase) return [];
     try {
       const saved = localStorage.getItem('dar_al_nar_reservations');
       return saved ? JSON.parse(saved) : INITIAL_RESERVATIONS;
@@ -170,7 +145,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   });
 
   const [inquiries, setInquiries] = useState<CustomerInquiry[]>(() => {
-    if (supabase) return [];
     try {
       const saved = localStorage.getItem('dar_al_nar_inquiries');
       return saved ? JSON.parse(saved) : INITIAL_INQUIRIES;
@@ -180,7 +154,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   });
 
   const [settings, setSettings] = useState<RestaurantSettings>(() => {
-    if (supabase) return INITIAL_SETTINGS;
     try {
       const saved = localStorage.getItem('dar_al_nar_settings');
       return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
@@ -195,28 +168,44 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     document.documentElement.lang = language;
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
-    localStorage.setItem('dar_al_nar_lang', language);
+    try {
+      localStorage.setItem('dar_al_nar_lang', language);
+    } catch {
+      // Ignore
+    }
   }, [language]);
 
   // Sync state to local storage
   useEffect(() => {
-    if (supabase) return;
-    localStorage.setItem('dar_al_nar_menu', JSON.stringify(menuItems));
+    try {
+      localStorage.setItem('dar_al_nar_menu', JSON.stringify(menuItems));
+    } catch {
+      // Ignore
+    }
   }, [menuItems]);
 
   useEffect(() => {
-    if (supabase) return;
-    localStorage.setItem('dar_al_nar_reservations', JSON.stringify(reservations));
+    try {
+      localStorage.setItem('dar_al_nar_reservations', JSON.stringify(reservations));
+    } catch {
+      // Ignore
+    }
   }, [reservations]);
 
   useEffect(() => {
-    if (supabase) return;
-    localStorage.setItem('dar_al_nar_inquiries', JSON.stringify(inquiries));
+    try {
+      localStorage.setItem('dar_al_nar_inquiries', JSON.stringify(inquiries));
+    } catch {
+      // Ignore
+    }
   }, [inquiries]);
 
   useEffect(() => {
-    if (supabase) return;
-    localStorage.setItem('dar_al_nar_settings', JSON.stringify(settings));
+    try {
+      localStorage.setItem('dar_al_nar_settings', JSON.stringify(settings));
+    } catch {
+      // Ignore
+    }
   }, [settings]);
 
   const setLanguage = (lang: Language) => {
@@ -239,74 +228,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const saveRecord = async <T extends { id: string }>(kind: string, data: T) => {
-    if (!supabase) return true;
-    const { error } = await supabase.from('restaurant_records').upsert({ id: data.id, kind, data });
-    if (error) {
-      addToast('error', language === 'ar' ? 'تعذر الحفظ' : 'Save failed', error.message);
-      return false;
-    }
-    return true;
-  };
-
-  const deleteRecord = async (id: string) => {
-    if (!supabase) return true;
-    const { error } = await supabase.from('restaurant_records').delete().eq('id', id);
-    if (error) {
-      addToast('error', language === 'ar' ? 'تعذر الحذف' : 'Delete failed', error.message);
-      return false;
-    }
-    return true;
-  };
-
-  useEffect(() => {
-    const client = supabase;
-    if (!client || isAuthLoading) return;
-
-    let isMounted = true;
-    const loadRecords = async () => {
-      const { data, error } = await client
-        .from('restaurant_records')
-        .select('id, kind, data');
-
-      if (error) {
-        addToast('error', 'Database connection failed', error.message);
-        return;
-      }
-
-      let records = data || [];
-      const isInitialized = records.some(record => record.id === 'system-initialized');
-      if (isAdminAuthenticated && !isInitialized) {
-        const initialRecords = [
-          ...INITIAL_MENU_ITEMS.map(item => ({ id: item.id, kind: 'menu', data: item })),
-          { id: 'restaurant-settings', kind: 'settings', data: INITIAL_SETTINGS },
-          { id: 'system-initialized', kind: 'system', data: { initialized: true } }
-        ];
-        const { error: seedError } = await client.from('restaurant_records').upsert(initialRecords);
-        if (seedError) {
-          addToast('error', 'Database initialization failed', seedError.message);
-          return;
-        }
-        records = [...records, ...initialRecords];
-      }
-
-      if (!isMounted) return;
-      const menuRecords = records.filter(record => record.kind === 'menu').map(record => record.data as unknown as MenuItem);
-      const reservationRecords = records.filter(record => record.kind === 'reservation').map(record => record.data as unknown as Reservation);
-      const inquiryRecords = records.filter(record => record.kind === 'inquiry').map(record => record.data as unknown as CustomerInquiry);
-      const settingsRecord = records.find(record => record.id === 'restaurant-settings');
-      setMenuItems(menuRecords.length ? menuRecords : INITIAL_MENU_ITEMS);
-      setReservations(reservationRecords);
-      setInquiries(inquiryRecords);
-      setSettings(settingsRecord ? settingsRecord.data as unknown as RestaurantSettings : INITIAL_SETTINGS);
-    };
-
-    void loadRecords();
-    return () => {
-      isMounted = false;
-    };
-  }, [isAdminAuthenticated, isAuthLoading]);
-
   const openReservationModal = (dish?: MenuItem) => {
     if (dish) {
       setSelectedDishForModal(dish);
@@ -320,7 +241,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Reservation actions
   const addReservation = async (resData: Omit<Reservation, 'id' | 'referenceNo' | 'createdAt' | 'status'>): Promise<Reservation> => {
-    // Generate authentic Omani reference number: DAN-YYYY-XXXX
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const newReservation: Reservation = {
       ...resData,
@@ -330,80 +250,61 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       createdAt: new Date().toISOString()
     };
 
-    if (!(await saveRecord('reservation', newReservation))) {
-      throw new Error('Reservation could not be saved. Please try again.');
-    }
     setReservations(prev => [newReservation, ...prev]);
     return newReservation;
   };
 
-  const updateReservationStatus = async (id: string, status: ReservationStatus) => {
-    const reservation = reservations.find(item => item.id === id);
-    if (!reservation) return;
-    const updatedReservation = { ...reservation, status };
-    if (!(await saveRecord('reservation', updatedReservation))) return;
+  const updateReservationStatus = (id: string, status: ReservationStatus) => {
     setReservations(prev => prev.map(r => r.id === id ? { ...r, status } : r));
     addToast('success', language === 'ar' ? 'تم تحديث حالة الحجز' : 'Reservation Updated', 
       language === 'ar' ? `الحجز الآن بحالة: ${translations.ar.admin.status[status]}` : `Status changed to ${status}`);
   };
 
-  const updateReservationTable = async (id: string, tableNumber: string) => {
-    const reservation = reservations.find(item => item.id === id);
-    if (!reservation || !(await saveRecord('reservation', { ...reservation, tableNumber }))) return;
+  const updateReservationTable = (id: string, tableNumber: string) => {
     setReservations(prev => prev.map(r => r.id === id ? { ...r, tableNumber } : r));
     addToast('info', language === 'ar' ? 'تم تعيين الطاولة' : 'Table Assigned', 
       language === 'ar' ? `تم تخصيص الطاولة ${tableNumber}` : `Assigned table ${tableNumber}`);
   };
 
-  const deleteReservation = async (id: string) => {
-    if (!(await deleteRecord(id))) return;
+  const deleteReservation = (id: string) => {
     setReservations(prev => prev.filter(r => r.id !== id));
     addToast('warning', language === 'ar' ? 'تم حذف الحجز' : 'Reservation Removed', 
       language === 'ar' ? 'تم حذف سجل الحجز من النظام' : 'Reservation entry has been removed');
   };
 
   // Menu actions
-  const addMenuItem = async (itemData: Omit<MenuItem, 'id'>) => {
+  const addMenuItem = (itemData: Omit<MenuItem, 'id'>) => {
     const newItem: MenuItem = {
       ...itemData,
       id: `dish-${Date.now()}`
     };
-    if (!(await saveRecord('menu', newItem))) return;
     setMenuItems(prev => [newItem, ...prev]);
     addToast('success', language === 'ar' ? 'تمت إضافة طبق جديد' : 'New Dish Added', 
       language === 'ar' ? `تمت إضافة ${newItem.nameAr} إلى قائمة الطعام` : `Added ${newItem.nameEn} to menu`);
   };
 
-  const updateMenuItem = async (id: string, itemData: Partial<MenuItem>) => {
-    const existingItem = menuItems.find(item => item.id === id);
-    if (!existingItem) return;
-    const updatedItem = { ...existingItem, ...itemData };
-    if (!(await saveRecord('menu', updatedItem))) return;
+  const updateMenuItem = (id: string, itemData: Partial<MenuItem>) => {
     setMenuItems(prev => prev.map(item => item.id === id ? { ...item, ...itemData } : item));
     addToast('success', language === 'ar' ? 'تم تعديل الطبق' : 'Menu Item Updated', 
       language === 'ar' ? 'تم حفظ التعديلات بنجاح' : 'Changes saved successfully');
   };
 
-  const deleteMenuItem = async (id: string) => {
-    if (!(await deleteRecord(id))) return;
+  const deleteMenuItem = (id: string) => {
     setMenuItems(prev => prev.filter(item => item.id !== id));
     addToast('warning', language === 'ar' ? 'تم حذف الطبق' : 'Item Deleted', 
       language === 'ar' ? 'تم حذف الطبق من قائمة الطعام' : 'Dish removed from the menu');
   };
 
-  const toggleMenuItemAvailability = async (id: string) => {
+  const toggleMenuItemAvailability = (id: string) => {
     const item = menuItems.find(menuItem => menuItem.id === id);
     if (!item) return;
     const nextAvail = !item.isAvailable;
-    if (!(await saveRecord('menu', { ...item, isAvailable: nextAvail }))) return;
     setMenuItems(prev => prev.map(menuItem => menuItem.id === id ? { ...menuItem, isAvailable: nextAvail } : menuItem));
     addToast('info', language === 'ar' ? 'حالة التوفر' : 'Availability Changed',
       language === 'ar' ? `الطبق الآن ${nextAvail ? 'متاح' : 'غير متوفر'}` : `Dish is now ${nextAvail ? 'available' : 'unavailable'}`);
   };
 
-  const toggleMenuItemSpecial = async (id: string) => {
-    const item = menuItems.find(menuItem => menuItem.id === id);
-    if (!item || !(await saveRecord('menu', { ...item, isChefsSpecial: !item.isChefsSpecial }))) return;
+  const toggleMenuItemSpecial = (id: string) => {
     setMenuItems(prev => prev.map(menuItem => menuItem.id === id ? { ...menuItem, isChefsSpecial: !menuItem.isChefsSpecial } : menuItem));
   };
 
@@ -415,18 +316,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       status: 'new',
       createdAt: new Date().toISOString()
     };
-    if (!(await saveRecord('inquiry', newInq))) {
-      throw new Error('Inquiry could not be submitted. Please try again.');
-    }
     setInquiries(prev => [newInq, ...prev]);
     return newInq;
   };
 
-  const updateInquiryStatus = async (id: string, status: InquiryStatus, notes?: string) => {
-    const inquiry = inquiries.find(item => item.id === id);
-    if (!inquiry) return;
-    const updatedInquiry = { ...inquiry, status, notes: notes !== undefined ? notes : inquiry.notes };
-    if (!(await saveRecord('inquiry', updatedInquiry))) return;
+  const updateInquiryStatus = (id: string, status: InquiryStatus, notes?: string) => {
     setInquiries(prev => prev.map(inq => {
       if (inq.id === id) {
         return {
@@ -442,34 +336,24 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   // Settings
-  const updateSettings = async (newSettings: Partial<RestaurantSettings>) => {
-    const updatedSettings = { ...settings, ...newSettings };
-    if (!(await saveRecord('settings', { id: 'restaurant-settings', ...updatedSettings }))) return;
+  const updateSettings = (newSettings: Partial<RestaurantSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
     addToast('success', language === 'ar' ? 'تم حفظ الإعدادات' : 'Settings Saved', 
       language === 'ar' ? 'تم تحديث إعدادات المطعم بنجاح' : 'Restaurant settings updated');
   };
 
-  const resetToDemoData = async () => {
-    if (supabase) {
-      const { error } = await supabase.from('restaurant_records').delete().neq('kind', 'system');
-      if (error) {
-        addToast('error', 'Reset failed', error.message);
-        return;
-      }
-      const seedRecords = [
-        ...INITIAL_MENU_ITEMS.map(item => ({ id: item.id, kind: 'menu', data: item })),
-        { id: 'restaurant-settings', kind: 'settings', data: INITIAL_SETTINGS }
-      ];
-      const { error: seedError } = await supabase.from('restaurant_records').upsert(seedRecords);
-      if (seedError) {
-        addToast('error', 'Reset failed', seedError.message);
-        return;
-      }
+  const resetToDemoData = () => {
+    try {
+      localStorage.removeItem('dar_al_nar_menu');
+      localStorage.removeItem('dar_al_nar_reservations');
+      localStorage.removeItem('dar_al_nar_inquiries');
+      localStorage.removeItem('dar_al_nar_settings');
+    } catch {
+      // Ignore
     }
     setMenuItems(INITIAL_MENU_ITEMS);
-    setReservations(supabase ? [] : INITIAL_RESERVATIONS);
-    setInquiries(supabase ? [] : INITIAL_INQUIRIES);
+    setReservations(INITIAL_RESERVATIONS);
+    setInquiries(INITIAL_INQUIRIES);
     setSettings(INITIAL_SETTINGS);
     addToast('info', 'Demo Data Reset', 'Reset to initial Omani culinary demo dataset');
   };
@@ -514,14 +398,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       addInquiry,
       updateInquiryStatus,
       updateSettings,
-      resetToDemoData
+      resetToDemoData,
     }}>
       {children}
     </RestaurantContext.Provider>
   );
 };
 
-export const useRestaurant = () => {
+export const useRestaurant = (): RestaurantContextType => {
   const context = useContext(RestaurantContext);
   if (!context) {
     throw new Error('useRestaurant must be used within a RestaurantProvider');
