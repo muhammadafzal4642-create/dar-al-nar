@@ -87,7 +87,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss(), localAdminAuth(env)],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       },
     },
     server: {
